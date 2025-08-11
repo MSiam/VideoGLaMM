@@ -25,12 +25,12 @@ def subsample_images(images, t):
         raise ValueError("Input images must be either a list of PIL images or a numpy array.")
 
 def get_imgs_and_masks_from_video(data_i):
-    
+
     # video_annotations = data_i['annotations']
-    
+
     # assert len(video_annotations)==data_i['length'], f"len(video_annotations): {len(video_annotations)}     data_i['length']:{data_i['length']}"
     vid_len = data_i['length']
-    
+
     # h,w = data_i['annotations'][0][0]['segmentation']['size']
     imgs = []
     for frame_idx in range(vid_len):
@@ -38,7 +38,7 @@ def get_imgs_and_masks_from_video(data_i):
         img = Image.open(img_path).convert('RGB')
         w, h = img.size
         imgs.append(img)
-    
+
     gt_masks = np.zeros((vid_len, h, w), dtype=np.uint8)
     # pred_masks = np.zeros((vid_len, h, w), dtype=np.uint8)
 
@@ -53,11 +53,11 @@ def get_imgs_and_masks_from_video(data_i):
                             gt_masks[frame_idx] += cocomask.decode(mask_rle)
                     except:
                         print('frame_idx:', frame_idx, '    anno_id:', anno_id)
-            
+
     return imgs, gt_masks
 
 def load_mevis_json(mevis_root, image_set):
-        
+
     image_root = os.path.join(mevis_root, image_set) # "./video_dataset/mevis/train"
     json_file = os.path.join(mevis_root, image_set, "meta_expressions.json") # "./video_dataset/mevis/train/meta_expressions.json"
 
@@ -146,7 +146,7 @@ def load_mevis_json(mevis_root, image_set):
         record["sentence"] = exp
         record["exp_id"] = exp_id
         record["video_name"] = video_name
-        
+
         dataset_dicts.append(record)
 
     if num_instances_without_valid_segmentation > 0:
@@ -161,35 +161,35 @@ class MeVISBaseDataset(Dataset):
     def __init__(self, base_video_dataset_dir, image_set,
                  num_frames=-1
                  ):
-        
+
         self.num_frames = num_frames
         self.image_set = image_set
         assert self.image_set in ["train", "valid", "valid_u"], f"invalid image_set:{self.image_set}"
-        
-        mevis_root = os.path.join(base_video_dataset_dir, "mevis")
+
+        mevis_root = base_video_dataset_dir #os.path.join(base_video_dataset_dir, "mevis")
         self.dataset = load_mevis_json(mevis_root, self.image_set)
         print("Done loading {} samples.".format(len(self.dataset)))
-        
+
     def __len__(self):
         return len(self.dataset)
-    
+
     def __getitem__(self, idx):
         data_i = self.dataset[idx]
         pil_images, gt_masks = get_imgs_and_masks_from_video(data_i)
         if not self.num_frames==-1:
-            pil_images, gt_masks = subsample_images(pil_images, self.num_frames), subsample_images(gt_masks, self.num_frames) 
-            
+            pil_images, gt_masks = subsample_images(pil_images, self.num_frames), subsample_images(gt_masks, self.num_frames)
+
         caption = data_i['sentence']
         video_path = (data_i['video_name'], data_i['exp_id'])
-        
+
         np_images = [np.array(image) for image in pil_images]
         np_images = np.stack(np_images, axis=0)
-        
+
         target = {
                 'masks': gt_masks,                          # [T, H, W]
                 'caption': caption,
                 'pil_images': pil_images,
                 'video_path': video_path
             }
-        
+
         return np_images, target
